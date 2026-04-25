@@ -31,18 +31,18 @@ app.add_middleware(
 )
 
 # ============================================================
-# MODELO
+# MODELO (SIN VALIDACIÓN AUTOMÁTICA DE gt/le)
 # ============================================================
 
 class Producto(BaseModel):
     codigo: str = Field(..., example="PROD-001")
     nombre: str = Field(..., example="Camisa")
-    costo_base: float = Field(..., gt=0)
-    descuento: float = Field(..., ge=0, le=100)
-    iva: float = Field(..., ge=0, le=100)
+    costo_base: float
+    descuento: float
+    iva: float
 
 # ============================================================
-# VALIDACIÓN
+# VALIDACIÓN MANUAL
 # ============================================================
 
 def validar_campos(producto: Producto):
@@ -56,23 +56,34 @@ def validar_campos(producto: Producto):
     return True, ""
 
 # ============================================================
-# RUTA PRINCIPAL (IMPORTANTE PARA EVITAR 404 EN /)
+# HOME (evita 404 en /)
 # ============================================================
 
 @app.get("/")
 def home():
     return {
         "mensaje": "API activa",
-        "endpoint_principal": "/calcular/valorfinal",
-        "docs": "/docs"
+        "endpoint": "/calcular/valorfinal"
     }
 
 # ============================================================
-# ENDPOINT CALCULO
+# ENDPOINT PRINCIPAL
 # ============================================================
 
 @app.post("/calcular/valorfinal")
 def calcular_valor_final(producto: Producto):
+
+    # 🔴 VALIDACIÓN PERSONALIZADA (404 QUE QUIERES)
+    if producto.costo_base <= 0:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "codigo_http": 404,
+                "titulo": "Valor no válido",
+                "detalle": "El costo base no puede ser negativo o cero",
+                "valor_final": 0
+            }
+        )
 
     valido, error = validar_campos(producto)
 
@@ -82,7 +93,8 @@ def calcular_valor_final(producto: Producto):
             content={
                 "codigo_http": 400,
                 "titulo": "Error de validación",
-                "detalle": error
+                "detalle": error,
+                "valor_final": 0
             }
         )
 
@@ -112,6 +124,7 @@ def calcular_valor_final(producto: Producto):
             content={
                 "codigo_http": 500,
                 "titulo": "Error interno",
-                "detalle": str(e)
+                "detalle": str(e),
+                "valor_final": 0
             }
         )
