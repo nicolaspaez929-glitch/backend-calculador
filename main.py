@@ -2,14 +2,14 @@
 # IMPORTACIONES
 # ============================================================
 
-from fastapi import FastAPI  # Framework principal
-from fastapi.middleware.cors import CORSMiddleware  # CORS
-from pydantic import BaseModel, Field  # Validación de datos
-from fastapi.responses import JSONResponse  # Respuestas personalizadas
-import re  # Expresiones regulares
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+from fastapi.responses import JSONResponse
+import re
 
 # ============================================================
-# CREACIÓN DE LA APP
+# APP
 # ============================================================
 
 app = FastAPI(
@@ -19,19 +19,19 @@ app = FastAPI(
 )
 
 # ============================================================
-# CONFIGURACIÓN CORS
+# CORS
 # ============================================================
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permite todos los orígenes (Hostinger)
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ============================================================
-# MODELO DE DATOS (VALIDACIÓN AUTOMÁTICA)
+# MODELO
 # ============================================================
 
 class Producto(BaseModel):
@@ -42,58 +42,55 @@ class Producto(BaseModel):
     iva: float = Field(..., ge=0, le=100)
 
 # ============================================================
-# VALIDACIONES PERSONALIZADAS
+# VALIDACIÓN
 # ============================================================
 
 def validar_campos(producto: Producto):
-    
-    # Validar código (alfanumérico con guiones)
+
     if not re.match(r'^[a-zA-Z0-9\-]+$', producto.codigo):
         return False, "Código inválido"
-    
-    # Validar nombre (solo letras)
+
     if not re.match(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$', producto.nombre):
         return False, "Nombre inválido"
-    
+
     return True, ""
 
 # ============================================================
-# ENDPOINT PRINCIPAL
+# RUTA PRINCIPAL (IMPORTANTE PARA EVITAR 404 EN /)
+# ============================================================
+
+@app.get("/")
+def home():
+    return {
+        "mensaje": "API activa",
+        "endpoint_principal": "/calcular/valorfinal",
+        "docs": "/docs"
+    }
+
+# ============================================================
+# ENDPOINT CALCULO
 # ============================================================
 
 @app.post("/calcular/valorfinal")
 def calcular_valor_final(producto: Producto):
 
-    # Validar campos
     valido, error = validar_campos(producto)
 
     if not valido:
         return JSONResponse(
-            status_code=404,
+            status_code=400,
             content={
-                "codigo_http": 404,
-                "titulo": "Valor no encontrado",
-                "valor": 0,
+                "codigo_http": 400,
+                "titulo": "Error de validación",
                 "detalle": error
             }
         )
 
     try:
-        # ===============================
-        # CÁLCULOS
-        # ===============================
-
         descuento_pesos = producto.costo_base * (producto.descuento / 100)
-
         valor_con_descuento = producto.costo_base - descuento_pesos
-
         iva_pesos = valor_con_descuento * (producto.iva / 100)
-
         valor_final = valor_con_descuento + iva_pesos
-
-        # ===============================
-        # RESPUESTA EXITOSA
-        # ===============================
 
         return {
             "codigo_http": 200,
@@ -111,11 +108,10 @@ def calcular_valor_final(producto: Producto):
 
     except Exception as e:
         return JSONResponse(
-            status_code=404,
+            status_code=500,
             content={
-                "codigo_http": 404,
-                "titulo": "Valor no encontrado",
-                "valor": 0,
+                "codigo_http": 500,
+                "titulo": "Error interno",
                 "detalle": str(e)
             }
         )
